@@ -1,5 +1,5 @@
-GRP Plugin for Windows Commander
-================================
+GRP Plugin for Windows Commander v1.0
+=====================================
 
 
  * How to install this plugin (32 bit only):
@@ -17,10 +17,9 @@ GRP Plugin for Windows Commander
  * What it does:
 ----------------
 
-Read-only support for GRP (Duke Nukem 3D and other games based
-on Build engine group file) file format in Windows Commander.
-List of some games that uses Build engine, and consequently
-GRP format to store files:
+Extract/create support for GRP (Duke Nukem 3D and other Build engine-based
+games group file) file format in Windows Commander. List of some games that
+uses Build engine, and consequently GRP format to store files:
 
  o Duke Nukem 3D
  o Blood
@@ -47,16 +46,33 @@ and the fastest WCX out there. It's also the first WCX I know
 programmed in so low-level language. The main purpose of writing
 it was fun, of course. But you can also use it as reference
 platform to write your own assembly plugins, as the GRP format
-itself is probably the simpliest existing. Anyway, currently this
-plugin supports the widest range of games too ;)
+itself is probably the simpliest existing. So, plugin has
+educational purposes too. Anyway, currently this plugin supports
+the widest range of games... Have phun, abandonware-game hackers! =D
+
+
+* Bugs:
+-------
+
+ o Has 5 global (out-of-handle) variables. Really don't know what's going
+   to happen if WinCmd called 2 instances of extractor :/
+ o Too many macros... ".if eax == 0" commonly used instead of "or eax, eax".
+   That's sacrifice I did to keep code cleaner... More than 800 lines of
+   code in single file *REALLY* pisses me off!
 
 
 * TODO:
 -------
 
- o Write (add/create/delete) support. One day, & it's far away...
- o Open TILES###.ART as archive with bitmaps. Not necessary in asm, *humpf*
+ o Open TILES###.ART as archive with images. Not necessary in asm, *humpf*
  o IrfanView plugin to decode ANM... Just a dream ;)
+
+* Not-TODO:
+-------
+
+ o Modify/delete support. GRP format wasn't designed to support such
+   humiliation. It would be faster to extract & rebuild entire archive
+   then write such a crap ;)
 
 
  * References:
@@ -67,6 +83,9 @@ plugin supports the widest range of games too ;)
  o "WCX Writer's Reference" by Christian Ghisler & Jiri Barton
  o ISO Plugin for Windows Commander by Sergey Oblomov
  o PACK Plugin for Windows Commander by DarkOne
+ o GRP.WCX 'packed' by "PE Rebuilder v0.96b" By TiTi/PC-BLZ & Virogen/PC
+ o "Mastering Turbo Assembler®" book by Tom Swan (simply the best reference
+   about TASM!)
 
 
  * License:
@@ -97,5 +116,5 @@ plugin supports the widest range of games too ;)
 Stanislaw Y. Pusep (a.k.a. Stas)
 
     E-Mail:	stanis@linuxmail.org
-    site:	http://sysdlabs.hypermart.net/
+    Site:	http://sysdlabs.hypermart.net/
 (here you can find this program & other cool things for Duke3D)

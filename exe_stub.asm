@@ -17,7 +17,7 @@
 ;    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ;
 ;    E-Mail:	stanis@linuxmail.org
-;    site:	http://sysdlabs.hypermart.net/
+;    Site:	http://sysdlabs.hypermart.net/
 
 
 	P486
@@ -34,13 +34,25 @@ EXTRN	SetProcessDataProc		: PROC
 EXTRN	ReadHeader			: PROC
 EXTRN	ProcessFile			: PROC
 EXTRN	CloseArchive			: PROC
+EXTRN	PackFiles			: PROC
 
 	DATASEG
 
-file1		DB			"C:\Games\DUKE3D\DUKE3D.GRP", NULL
+; common data
 dir1		DB			"D:\Stas\buf\grp_wincmd\test\", NULL
+
+; data for reading
+file1		DB			"C:\Games\DUKE3D\DUKE3D.GRP", NULL
 data1		tOpenArchiveData	<offset file1, PK_OM_EXTRACT>
 data2		tHeaderData		<?>
+
+; data for writing
+new1		DB			"test.grp", NULL
+list1		DB			"test1234.dat", NULL
+		DB			"test2.dat", NULL
+		DB			"test3.dat", NULL
+		DB			"test4.dat", NULL
+		DB			NULL
 
 	UDATASEG
 
@@ -49,6 +61,13 @@ hArc		HANDLE	?
 	CODESEG
 
 Start:
+;	call	Read
+	call	Write
+
+	call	ExitProcess, 0
+
+
+Read	PROC
 	call	OpenArchive, offset data1
 	or	eax, eax
 	jz	@@bye
@@ -71,7 +90,8 @@ Start:
 	call	CloseArchive, [hArc]
 
 @@bye:
-	call	ExitProcess, 0
+	ret
+Read	ENDP
 
 
 dummy PROC
@@ -81,5 +101,12 @@ dummy PROC
 	inc	eax
 	ret
 dummy ENDP
+
+
+Write	PROC
+	call	PackFiles, offset new1, NULL, offset dir1, offset list1, 0
+	ret
+Write	ENDP
+
 
 END Start

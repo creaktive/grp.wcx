@@ -17,7 +17,7 @@
 ;    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ;
 ;    E-Mail:	stanis@linuxmail.org
-;    site:	http://sysdlabs.hypermart.net/
+;    Site:	http://sysdlabs.hypermart.net/
 
 
 	P486
@@ -35,16 +35,14 @@ GLOBAL	ProcessFile			: PROC
 GLOBAL	CloseArchive			: PROC
 GLOBAL	SetChangeVolProc		: PROC
 GLOBAL	SetProcessDataProc		: PROC
+GLOBAL	GetPackerCaps			: PROC
+GLOBAL	ConfigurePacker			: PROC
+GLOBAL	PackFiles			: PROC
 
 EXTRN	VirtualAlloc			: PROC
 EXTRN	VirtualFree			: PROC
 
 	DATASEG
-
-MAXFILES	EQU	4096
-sign		DB	"KenSilverman"
-
-	UDATASEG
 
 grp_entry STRUC
 	name		DB	12 DUP (?)
@@ -52,10 +50,48 @@ grp_entry STRUC
 grp_entry ENDS
 
 
+MAXFILES	EQU	4096
+CRLF		EQU	0Dh, 0Ah
+
+grp_capt	DB	"GRP Plugin v1.0", NULL
+grp_text	DB	"Duke3D and other Build engine-based group file un/packer", CRLF
+		DB	CRLF
+		DB	"Copyright © 2002  Stanislaw Y. Pusep", CRLF
+		DB	"stanis@linuxmail.org", CRLF
+		DB	"http://sysdlabs.hypermart.net/proj/", NULL
+bigname		DB	"Can't pack filenames not in MS-DOS 8.3 format!", NULL
+dirname		DB	"Can't pack sub-directories!", NULL
+
+
+sign		grp_entry	<"KenSilverman", 0>
+
+ProcessData	DD		offset	dummy
+
+	UDATASEG
+
 ent		grp_entry	<?>
 bytes_rdwr	INTEGER		?
+namebuf		DB		MAX_PATH DUP (?)
 
 	CODESEG
+
+; ***************************************************************************
+;	Dumb Macros
+; ***************************************************************************
+
+
+malloc MACRO memsize
+	call	VirtualAlloc, 0, memsize, MEM_COMMIT, PAGE_READWRITE
+ENDM
+
+free MACRO memblock, memsize
+	call	VirtualFree, memblock, memsize, MEM_DECOMMIT
+ENDM
+
+
+; ***************************************************************************
+;	Plugin Exports
+; ***************************************************************************
 
 
 OpenArchive PROC
@@ -66,7 +102,7 @@ OpenArchive PROC
 	mov	ebp, [ArchiveData]
 
 	; allocate buffer for our handle
-	call	VirtualAlloc, 0, SIZE HGRP, MEM_COMMIT, PAGE_READWRITE
+	malloc	<SIZE HGRP>
 	.if	eax == 0
 		mov	[ebp.OpenResult], E_NO_MEMORY
 		xor	eax, eax
@@ -124,29 +160,17 @@ OpenArchive PROC
 	push	edi
 	mov	esi, offset ent.name
 	mov	edi, offset sign
-	mov	ecx, 3
+	mov	ecx, 12 / 4
 	repz	cmpsd
 	pop	edi
 
 	jnz	@@unknown
 
-	; find archive filepath length
-	push	edi
-	mov	edi, [ebp.HArcName]
-	xor	eax, eax
-	mov	ecx, 260
-	repnz	scasb
-	pop	edi
-	sub	ecx, 260
-	neg	ecx
-
-	; save it
-	mov	[edi.arc_len], ecx
-
-	; save archive filepath
+	; save archive filepath/length
 	push	edi
 	mov	esi, [ebp.HArcName]
-	rep	movsb
+	call	strcat, 260
+	mov	[edi.arc_len], eax
 	pop	edi
 
 	; return pointer to handle
@@ -176,22 +200,24 @@ ReadHeader PROC
 		ret
 	.endif
 
-	; copy archive filename
+	;;;;;;;;;;;
 	push	edi
+
+	; copy archive filename
 	mov	ecx, [edi.arc_len]
 	mov	esi, edi
 	mov	edi, ebp
 	rep	movsb
-	pop	edi
 
 	; copy filename
-	push	edi
 	mov	esi, offset ent.name
 	lea	edi, [ebp.FileName]
-	mov	ecx, 3
+	mov	ecx, 12 / 4
 	rep	movsd
 	mov	BYTE PTR [edi], NULL
+
 	pop	edi
+	;;;;;;;;;;;
 
 	; set up the rest
 	mov	[ebp.Flags],		0
@@ -269,13 +295,13 @@ ProcessFile PROC
 	mov	esi, [DestPath]
 	or	esi, esi
 	jz	@@no_path
-	call	strcat
+	call	strcat, MAX_PATH
 
 @@no_path:
 	mov	esi, [DestName]
 	or	esi, esi
 	jz	@@no_name
-	call	strcat
+	call	strcat, MAX_PATH
 
 @@no_name:
 	mov	BYTE PTR [edi], NULL
@@ -292,43 +318,19 @@ ProcessFile PROC
 	; save file handle
 	mov	[hOut], eax
 
-	; EDX = last block size
-	mov	eax, [edi.psize]
-	xor	edx, edx
-	mov	ebx, BUFFSIZE
-	div	ebx
-
 	; save pointer to our buffer
 	lea	ebx, [edi.buff]
 
-	; do we have more than one block?
-	or	eax, eax
-	jz	@@last
-
-	; ECX = blocks count
-	mov	ecx, eax
-
 	; extract packed file
-@@copy:
-	call	copy, edi, [edi.grp], [hOut], ebx, BUFFSIZE, [FullName]
+	call	copy, [edi.grp], eax, ebx, BUFFSIZE, [edi.psize], [FullName]
 	.if	eax != 0
-@@err_close:
 		push	eax
 		call	CloseHandle, [hOut]
 		call	DeleteFile, [FullName]
 		pop	eax
 		ret
 	.endif
-	loop	@@copy
 
-@@last:
-	or	edx, edx
-	jz	@@close
-	call	copy, edi, [edi.grp], [hOut], ebx, edx, [FullName]
-	or	eax, eax
-	jnz	@@err_close
-
-@@close:
 	; close unpacked file
 	call	CloseHandle, [hOut]
 	.if	eax == 0
@@ -356,7 +358,7 @@ CloseArchive PROC
 	.endif
 
 	; release memory
-	call	VirtualFree, edi, SIZE HGRP, MEM_DECOMMIT
+	free	edi, <SIZE HGRP>
 
 	; return OK
 	xor	eax, eax
@@ -371,21 +373,194 @@ SetChangeVolProc ENDP
 
 SetProcessDataProc PROC
 	ARG	hArcData:HANDLE, pProcessDataProc:PTR
-	USES	edi
-
-	; restore pointers
-	mov	edi, [hArcData]
 
 	; copy value
 	mov	eax, [pProcessDataProc]
-	mov	[edi.procdata], eax
+	mov	[ProcessData], eax
 
 	ret
 SetProcessDataProc ENDP
 
 
+GetPackerCaps PROC
+	mov	eax, PK_CAPS_NEW + PK_CAPS_OPTIONS
+	ret
+GetPackerCaps ENDP
+
+
+ConfigurePacker PROC
+	ARG	Parent:HWND, DllInstance:HINSTANCE
+
+	call	MessageBox, [Parent], offset grp_text, offset grp_capt, MB_OK + MB_ICONINFORMATION
+
+	ret
+ConfigurePacker ENDP
+
+
+PackFiles PROC
+	ARG	PackedFile:LPSTR, SubPath:LPSTR, SrcPath:LPSTR, AddList:LPSTR, PackFlags:INTEGER
+	USES	ebx, ecx, edx, edi, esi
+	LOCAL	packfile:LPSTR, dirsize:INTEGER, newdir:LPVOID, newgrp:HANDLE
+
+	; check first
+	.if	[SubPath] != NULL
+@@subdir:
+		call	MessageBox, NULL, offset dirname, offset grp_capt, MB_OK + MB_ICONERROR + MB_TASKMODAL
+		mov	eax, E_NOT_SUPPORTED
+		ret
+	.endif
+	; just ignore as that's damn default :P
+;	test	[PackFlags], PK_PACK_SAVE_PATHS
+;	jnz	@@subdir
+
+	; store path to save
+	mov	esi, [SrcPath]
+	mov	edi, offset namebuf
+	call	strcat, MAX_PATH
+	mov	[packfile], edi
+
+	; scan AddList
+	call	scanlist, [AddList]
+	.if	eax == 0
+		mov	eax, E_NOT_SUPPORTED
+		ret
+	.elseif	eax > MAXFILES
+		mov	eax, E_TOO_MANY_FILES
+		ret
+	.endif
+
+	; save directory size
+	mov	[sign.size], eax
+	inc	eax
+	shl	eax, 4
+	mov	[dirsize], eax
+
+	; allocate buffer for directory
+	malloc	[dirsize]
+	.if	eax == 0
+		mov	eax, E_NO_MEMORY
+		ret
+	.endif
+
+	; save pointer to buffer
+	mov	[newdir], eax
+	mov	edi, eax
+
+	; open destination file
+	call	CreateFile, [PackedFile], GENERIC_WRITE, FILE_SHARE_READ,\
+		0, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL
+	.if	eax == INVALID_HANDLE_VALUE
+		mov	eax, E_ECREATE
+		ret
+	.endif
+
+	; save file handle
+	mov	[newgrp], eax
+
+	; skip directory
+	call	SetFilePointer, eax, [dirsize], NULL, FILE_BEGIN
+	.if	eax == 0
+		mov	eax, E_ECREATE
+		ret
+	.endif
+
+	; prepare buffer
+	mov	esi, offset sign
+	mov	ecx, (SIZE grp_entry) / 4
+	rep	movsd
+
+	; build directory
+	mov	esi, [AddList]
+	mov	ecx, [sign.size]
+
+@@build:
+	call	nextent, [newgrp], [PackedFile], [packfile]
+	.if	eax != 0
+		push	eax
+		free	[newdir], [dirsize]
+		call	DeleteFile, [PackedFile]
+		pop	eax
+		ret
+	.endif
+
+	; move file?
+	test	[PackFlags], PK_PACK_MOVE_FILES
+	jz	@@not_move
+
+	; is that right?!
+	pusha
+	call	DeleteFile, offset namebuf
+	.if	eax == 0
+		popa
+		mov	eax, E_EWRITE
+		ret
+	.endif
+	popa
+
+@@not_move:
+	loop	@@build
+
+	; restore pointer to buffer
+	mov	edi, [newdir]
+
+	; rewind
+	call	SetFilePointer, [newgrp], 0, NULL, FILE_BEGIN
+	.if	eax == -1
+		mov	eax, E_EWRITE
+		ret
+	.endif
+
+	; write directory
+	call	WriteFile, [newgrp], [newdir], [dirsize], offset bytes_rdwr, 0
+	mov	edx, [dirsize]
+	.if	[bytes_rdwr] != edx
+		mov	eax, E_EWRITE
+		ret
+	.endif
+
+	; close file
+	call	CloseHandle, [newgrp]
+	.if	eax == 0
+		mov	eax, E_ECLOSE
+		ret
+	.endif
+
+	; release memory
+	free	[newdir], [dirsize]
+	.if	eax == 0
+		mov	eax, E_SMALL_BUF
+		ret
+	.endif
+
+	; return OK
+	xor	eax, eax
+	ret
+PackFiles ENDP
+
+
+; ***************************************************************************
+;	Plugin Internals
+; ***************************************************************************
+
+
+; ===========================================================================
+; strcat (len) - concatenates strings up to NULL or len
+;
+; * Input:
+;	len	= max length to copy
+;	ESI	= source string
+;	EDI	= destiny string
+;
+; * Output:
+;	EAX	= number of chars copied
+;	ECX	= len - EAX
+;
+; ===========================================================================
+
 strcat PROC
-	mov	ecx, MAX_PATH
+	ARG	len:INTEGER
+
+	mov	ecx, [len]
 
 @@copy:
 	lodsb
@@ -395,15 +570,249 @@ strcat PROC
 	loop	@@copy
 
 @@copy_done:
+	mov	eax, ecx
+	sub	eax, [len]
+	neg	eax
+
 	ret
 strcat ENDP
 
-copy PROC
-	ARG	hArcData:HANDLE, from:HANDLE, to:HANDLE, buf:LPVOID, bufsize:INTEGER, fname:LPSTR
-	USES	ebx, ecx, edx, edi
 
-	; restore pointers
-	mov	edi, [hArcData]
+; ===========================================================================
+; scanlist (list) - preparses "AddList" data
+;
+; * Input:
+;	list	= pointer to AddList
+;
+; * Output:
+;	EAX	= number of files in list (0 if error)
+;
+; ===========================================================================
+
+scanlist PROC
+	ARG	list:LPSTR
+	USES	ebx, ecx, edx, esi
+
+	mov	esi, [list]
+	xor	ebx, ebx
+
+@@newstr:
+	mov	ecx, MAX_PATH
+	xor	edx, edx
+
+@@scan:
+	lodsb
+
+	.if	al == 0
+		.if	edx == 0
+			jmp	short @@endscan
+		.elseif	edx > 12
+@@msdos:
+			call	MessageBox, NULL, offset bigname, offset grp_capt, MB_OK + MB_ICONERROR + MB_TASKMODAL
+			xor	eax, eax
+			ret
+		.else
+			inc	ebx
+			jmp	short @@newstr
+		.endif
+	.elseif	al == ' '
+		jmp	short @@msdos
+	.elseif	al == '\'
+		call	MessageBox, NULL, offset dirname, offset grp_capt, MB_OK + MB_ICONERROR + MB_TASKMODAL
+		xor	eax, eax
+		ret
+	.endif
+
+	inc	edx
+	loop	@@scan
+
+@@endscan:
+	mov	eax, ebx
+	ret
+scanlist ENDP
+
+
+; ===========================================================================
+; nextent (to, packfile) - stores next file
+;
+; * Input:
+;	to	= output file handle
+;	packfile= name of file to pack
+;
+; * Output:
+;	EAX	= 0 on success; else WinCmd error code
+;
+; ===========================================================================
+
+nextent PROC
+	ARG	to:HANDLE, packedfile:LPSTR, packfile:LPSTR
+	USES	ecx, edx
+	LOCAL	from:HANDLE, copysize:INTEGER, buf:LPVOID
+
+	; store filename in directory/name buffer
+	mov	ecx, 13
+	mov	edx, [packfile]
+
+@@copy:
+	; load character
+	lodsb
+
+	; convert to uppercase
+	.if	al >= 'a'
+		.if	al <= 'z'
+			sub	al, ('a' - 'A')
+		.endif
+	.endif
+
+	; weird but works ;)
+	xchg	edi, edx
+	stosb
+	xchg	edi, edx
+
+	; reached the end?
+	or	al, al
+	jz	@@copy_done
+
+	; store character
+	stosb
+
+	; go until reach NULL or ECX == 0
+	loop	@@copy
+
+@@copy_done:
+	dec	ecx
+	add	edi, ecx
+
+	; open file to be packed
+	call	CreateFile, offset namebuf, GENERIC_READ, FILE_SHARE_READ,\
+		0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL
+	.if	eax == INVALID_HANDLE_VALUE
+		mov	eax, E_EOPEN
+		ret
+	.endif
+
+	; save handle
+	mov	[from], eax
+
+	; check file size
+	call	GetFileSize, eax, NULL
+	.if	eax == -1
+		mov	eax, E_EOPEN
+		ret
+	.endif
+
+	; save size in directory
+	mov	[copysize], eax
+	stosd
+
+	; allocate buffer for transfer
+	malloc	BUFFSIZE
+	.if	eax == 0
+		mov	eax, E_SMALL_BUF
+		ret
+	.endif
+
+	; save pointer
+	mov	[buf], eax
+
+	; pack file
+	call	copy, [from], [to], [buf], BUFFSIZE, [copysize], offset namebuf
+	.if	eax != 0
+		push	eax
+		call	CloseHandle, [to]
+		free	[buf], BUFFSIZE
+		pop	eax
+		ret
+	.endif
+
+	; release memory
+	free	[buf], BUFFSIZE
+	.if	eax == 0
+		mov	eax, E_SMALL_BUF
+		ret
+	.endif
+
+	; close file
+	call	CloseHandle, [from]
+	.if	eax == 0
+		mov	eax, E_ECLOSE
+		ret
+	.endif
+
+	xor	eax, eax
+	ret
+nextent ENDP
+
+
+; ===========================================================================
+; copy (from, to, buf, bufsize, totsize, fname) - copies multiple blocks
+;
+; * Input:
+;	from	= "from" file handle
+;	to	= "to" file handle
+;	buf	= pointer to transfer buffer
+;	bufsize	= size of transfer buffer
+;	totsize	= size of all data
+;	fname	= current filename
+;
+; * Output:
+;	EAX	= 0 on success; else WinCmd error code
+;
+; ===========================================================================
+
+copy PROC
+	ARG	from:HANDLE, to:HANDLE, buf:LPVOID, bufsize:INTEGER, totsize:INTEGER, fname:LPSTR
+	USES	ebx, ecx, edx
+
+	; EDX = last block size
+	mov	eax, [totsize]
+	xor	edx, edx
+	mov	ebx, [bufsize]
+	div	ebx
+
+	; do we have more than one block?
+	or	eax, eax
+	jz	@@last
+
+	; ECX = blocks count
+	mov	ecx, eax
+
+	; extract packed file
+@@copy:
+	call	copyblock, [from], [to], [buf], BUFFSIZE, [fname]
+	.if	eax != 0
+		ret
+	.endif
+	loop	@@copy
+
+@@last:
+	or	edx, edx
+	jz	@@close
+	call	copyblock, [from], [to], [buf], edx, [fname]
+
+@@close:
+	ret
+copy ENDP
+
+
+; ===========================================================================
+; copyblock (from, to, buf, bufsize, fname) - transfers a block of data between two file handles
+;
+; * Input:
+;	from	= "from" file handle
+;	to	= "to" file handle
+;	buf	= pointer to transfer buffer
+;	bufsize	= size of transfer buffer
+;	fname	= current filename
+;
+; * Output:
+;	EAX	= 0 on success; else WinCmd error code
+;
+; ===========================================================================
+
+copyblock PROC
+	ARG	from:HANDLE, to:HANDLE, buf:LPVOID, bufsize:INTEGER, fname:LPSTR
+	USES	ebx, ecx, edx
 
 	; read block
 	call	ReadFile, [from], [buf], [bufsize], offset bytes_rdwr, 0
@@ -422,7 +831,7 @@ copy PROC
 	.endif
 
 	; update process indicator
-	call	[edi.procdata], [fname], [bufsize]
+	call	[ProcessData], [fname], [bufsize]
 	.if	eax == 0
 		mov	eax, E_EABORTED
 		ret
@@ -431,6 +840,28 @@ copy PROC
 	; return OK
 	xor	eax, eax
 	ret
-copy ENDP
+copyblock ENDP
+
+
+; ===========================================================================
+; dummy (xFileName, xSize) - dummy "tProcessDataProc" callback
+;
+; * Input:
+;	xFileName	= name of file being processed
+;	xSize		= size of those file
+;
+; * Output:
+;	EAX	= 0 if user cancelled action
+;
+; ===========================================================================
+
+dummy PROC
+	ARG	xFileName:LPSTR, xSize:INTEGER
+
+	xor	eax, eax
+	inc	eax
+	ret
+dummy ENDP
+
 
 END

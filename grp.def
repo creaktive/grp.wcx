@@ -7,3 +7,6 @@ EXPORTS		OpenArchive
 		CloseArchive
 		SetChangeVolProc
 		SetProcessDataProc
+		GetPackerCaps
+		ConfigurePacker
+		PackFiles

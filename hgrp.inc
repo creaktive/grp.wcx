@@ -17,11 +17,11 @@
 ;    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ;
 ;    E-Mail:	stanis@linuxmail.org
-;    site:	http://sysdlabs.hypermart.net/
+;    Site:	http://sysdlabs.hypermart.net/
 
 
 ; useful constants
-BUFFSIZE	EQU	65536
+BUFFSIZE	EQU	32768
 
 ; handle for a GRP file
 HGRP STRUC
@@ -39,5 +39,4 @@ HGRP STRUC
 	psize		INTEGER ?
 
 	buff		DB	BUFFSIZE DUP (?)
-	procdata	DD	?
 HGRP ENDS

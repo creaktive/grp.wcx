@@ -17,7 +17,7 @@
 ;    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ;
 ;    E-Mail:	stanis@linuxmail.org
-;    site:	http://sysdlabs.hypermart.net/
+;    Site:	http://sysdlabs.hypermart.net/
 
 
 ;/* Error codes returned to calling application */
