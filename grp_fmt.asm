@@ -53,12 +53,12 @@ grp_entry ENDS
 MAXFILES	EQU	4096
 CRLF		EQU	0Dh, 0Ah
 
-grp_capt	DB	"GRP Plugin v1.01", NULL
+grp_capt	DB	"GRP Plugin v1.02", NULL
 grp_text	DB	"Duke3D and other Build engine-based group file un/packer", CRLF
 		DB	CRLF
 		DB	"Copyright © 2002  Stanislaw Y. Pusep", CRLF
 		DB	"stanis@linuxmail.org", CRLF
-		DB	"http://sysdlabs.hypermart.net/proj/", NULL
+		DB	"http://sysdlabs.hypermart.net/proj/sys.html#grp", NULL
 bigname		DB	"Can't pack filenames not in MS-DOS 8.3 format!", NULL
 dirname		DB	"Can't pack sub-directories!", NULL
 delete		DB	"Erasing "
@@ -385,7 +385,7 @@ SetProcessDataProc ENDP
 
 
 GetPackerCaps PROC
-	mov	eax, PK_CAPS_NEW + PK_CAPS_OPTIONS
+	mov	eax, PK_CAPS_MULTIPLE + PK_CAPS_NEW + PK_CAPS_OPTIONS
 	ret
 GetPackerCaps ENDP
 

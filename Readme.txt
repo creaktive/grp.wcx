@@ -1,4 +1,4 @@
-GRP Plugin for Windows Commander v1.01
+GRP Plugin for Windows Commander v1.02
 ======================================
 
 
