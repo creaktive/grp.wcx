@@ -104,7 +104,7 @@ dummy ENDP
 
 
 Write	PROC
-	call	PackFiles, offset new1, NULL, offset dir1, offset list1, 0
+	call	PackFiles, offset new1, NULL, offset dir1, offset list1, 0	;PK_PACK_MOVE_FILES
 	ret
 Write	ENDP
 

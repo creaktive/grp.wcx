@@ -1,5 +1,5 @@
-GRP Plugin for Windows Commander v1.0
-=====================================
+GRP Plugin for Windows Commander v1.01
+======================================
 
 
  * How to install this plugin (32 bit only):
@@ -54,10 +54,11 @@ the widest range of games... Have phun, abandonware-game hackers! =D
 * Bugs:
 -------
 
+ o "They Are Everywhere®"
  o Has 5 global (out-of-handle) variables. Really don't know what's going
    to happen if WinCmd called 2 instances of extractor :/
  o Too many macros... ".if eax == 0" commonly used instead of "or eax, eax".
-   That's sacrifice I did to keep code cleaner... More than 800 lines of
+   That's sacrifice I did to keep code cleaner... More than 900 lines of
    code in single file *REALLY* pisses me off!
 
 

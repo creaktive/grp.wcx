@@ -53,7 +53,7 @@ grp_entry ENDS
 MAXFILES	EQU	4096
 CRLF		EQU	0Dh, 0Ah
 
-grp_capt	DB	"GRP Plugin v1.0", NULL
+grp_capt	DB	"GRP Plugin v1.01", NULL
 grp_text	DB	"Duke3D and other Build engine-based group file un/packer", CRLF
 		DB	CRLF
 		DB	"Copyright © 2002  Stanislaw Y. Pusep", CRLF
@@ -61,17 +61,19 @@ grp_text	DB	"Duke3D and other Build engine-based group file un/packer", CRLF
 		DB	"http://sysdlabs.hypermart.net/proj/", NULL
 bigname		DB	"Can't pack filenames not in MS-DOS 8.3 format!", NULL
 dirname		DB	"Can't pack sub-directories!", NULL
-
+delete		DB	"Erasing "
 
 sign		grp_entry	<"KenSilverman", 0>
 
-ProcessData	DD		offset	dummy
+ProcessData	DD	offset	dummy
 
 	UDATASEG
 
 ent		grp_entry	<?>
 bytes_rdwr	INTEGER		?
-namebuf		DB		MAX_PATH DUP (?)
+
+deletemsg	DD	2 DUP (?)
+namebuf		DB	MAX_PATH DUP (?)
 
 	CODESEG
 
@@ -469,12 +471,13 @@ PackFiles PROC
 	mov	ecx, (SIZE grp_entry) / 4
 	rep	movsd
 
+
 	; build directory
 	mov	esi, [AddList]
 	mov	ecx, [sign.size]
 
 @@build:
-	call	nextent, [newgrp], [PackedFile], [packfile]
+	call	nextent, [newgrp], [packfile]
 	.if	eax != 0
 		push	eax
 		free	[newdir], [dirsize]
@@ -482,23 +485,8 @@ PackFiles PROC
 		pop	eax
 		ret
 	.endif
-
-	; move file?
-	test	[PackFlags], PK_PACK_MOVE_FILES
-	jz	@@not_move
-
-	; is that right?!
-	pusha
-	call	DeleteFile, offset namebuf
-	.if	eax == 0
-		popa
-		mov	eax, E_EWRITE
-		ret
-	.endif
-	popa
-
-@@not_move:
 	loop	@@build
+
 
 	; restore pointer to buffer
 	mov	edi, [newdir]
@@ -532,7 +520,13 @@ PackFiles PROC
 		ret
 	.endif
 
+	; delete files if user wishes so
+	test	[PackFlags], PK_PACK_MOVE_FILES
+	jz	@@normal
+	call	deletelist, [AddList], [sign.size], [packfile]
+
 	; return OK
+@@normal:
 	xor	eax, eax
 	ret
 PackFiles ENDP
@@ -637,7 +631,7 @@ scanlist ENDP
 ;
 ; * Input:
 ;	to	= output file handle
-;	packfile= name of file to pack
+;	packfile= pointer to end of path buffer
 ;
 ; * Output:
 ;	EAX	= 0 on success; else WinCmd error code
@@ -645,7 +639,7 @@ scanlist ENDP
 ; ===========================================================================
 
 nextent PROC
-	ARG	to:HANDLE, packedfile:LPSTR, packfile:LPSTR
+	ARG	to:HANDLE, packfile:LPSTR
 	USES	ecx, edx
 	LOCAL	from:HANDLE, copysize:INTEGER, buf:LPVOID
 
@@ -657,17 +651,17 @@ nextent PROC
 	; load character
 	lodsb
 
+	; weird but works ;)
+	xchg	edi, edx
+	stosb
+	xchg	edi, edx
+
 	; convert to uppercase
 	.if	al >= 'a'
 		.if	al <= 'z'
 			sub	al, ('a' - 'A')
 		.endif
 	.endif
-
-	; weird but works ;)
-	xchg	edi, edx
-	stosb
-	xchg	edi, edx
 
 	; reached the end?
 	or	al, al
@@ -739,6 +733,7 @@ nextent PROC
 		ret
 	.endif
 
+	; return OK
 	xor	eax, eax
 	ret
 nextent ENDP
@@ -841,6 +836,49 @@ copyblock PROC
 	xor	eax, eax
 	ret
 copyblock ENDP
+
+
+; ===========================================================================
+; deletelist (list, entn, packfile) - deletes files specified in "AddList"
+;
+; * Input:
+;	list	= pointer to AddList
+;	entn	= number of filenames in AddList
+;	packfile= pointer to end of path buffer
+;
+; * Output:
+;	none
+;
+; ===========================================================================
+
+deletelist PROC
+	ARG	list:LPSTR, entn:INTEGER, packfile:LPSTR
+	USES	ecx, esi, edi
+
+	; creepy
+	mov	esi, offset delete
+	mov	edi, offset deletemsg
+	movsd
+	movsd
+
+	; process AddList
+	mov	ecx, [entn]
+	mov	esi, [list]
+
+@@delete:
+	mov	edi, [packfile]
+
+	push	ecx
+	call	strcat, 13
+	mov	BYTE PTR [edi], NULL
+	call	[ProcessData], offset deletemsg, 0
+	call	DeleteFile, offset namebuf
+	pop	ecx
+
+	loop	@@delete
+
+	ret
+deletelist ENDP
 
 
 ; ===========================================================================
