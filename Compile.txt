@@ -1,0 +1,23 @@
+;    Copyright (C) 2002  Stanislaw Y. Pusep
+
+
+OK, that's simple. Just check if your compiler is TASM 5.0 and then execute DO.BAT.
+It should create GRP.WCX file. You can also compile it in debug mode:
+
+make /DDEBUG
+
+But it's probably non-sense as WCX is just a renamed DLL and it runs *from inside*
+Windows Commander... So, for debugging purposes I created a special EXE tester stub.
+Edit "exe_stub.asm" to fit your needs and then try out:
+
+make /DDEBUG grp.exe
+td32 grp
+
+Now that's OK to debug ;)
+And well, if you say me you can code WCX plugin with *NO* debugging at all,
+I GONNA KICK YOUR ASS!!!
+
+Good luck, man!
+
+; x86 asm rlz!
+hamlet		DB	2Bh or not 2Bh

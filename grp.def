@@ -1,0 +1,9 @@
+;    Copyright (C) 2002  Stanislaw Y. Pusep
+
+LIBRARY		grp_wincmd
+EXPORTS		OpenArchive
+		ReadHeader
+		ProcessFile
+		CloseArchive
+		SetChangeVolProc
+		SetProcessDataProc
